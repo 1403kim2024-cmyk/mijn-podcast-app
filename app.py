@@ -2,7 +2,7 @@ import streamlit as st
 import random
 
 # --- PAGINA INSTELLINGEN ---
-st.set_page_config(page_title="Mijn YouTube Playlist Mixer", page_icon="📺", layout="centered")
+st.set_page_config(page_title="Mijn YouTube Podcast Mixer", page_icon="📺", layout="centered")
 
 # --- CUSTOM CSS STYLING ---
 st.markdown("""
@@ -20,8 +20,8 @@ st.markdown("""
     h1, h3 { color: #005f5f !important; }
     .playlist-button {
         display: block; text-align: center; background-color: #e4719e; color: white !important;
-        font-weight: bold; font-size: 1.2em; padding: 15px; border-radius: 12px;
-        text-decoration: none; margin: 20px 0; box-shadow: 0 4px 15px rgba(228,113,158,0.4);
+        font-weight: bold; font-size: 1.1em; padding: 12px; border-radius: 10px;
+        text-decoration: none; margin-top: 10px; box-shadow: 0 3px 10px rgba(228,113,158,0.3);
     }
     .playlist-button:hover { background-color: #008b8b; }
     .badge { padding: 4px 10px; border-radius: 6px; font-size: 0.85em; margin-right: 5px; color: white; }
@@ -31,125 +31,130 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📺 Mijn Automatische YouTube Reismix")
-st.write("Genereer een playlist op maat. De knop opent YouTube waarin alles automatisch na elkaar afspeelt!")
+st.title("📺 Mijn YouTube Podcast Mixer")
+st.write("Kies je reistijd en vind de perfecte podcast-afspeellijst die automatisch doorloopt!")
 st.write("---")
 
-if "bekeken_videos" not in st.session_state:
-    st.session_state.bekeken_videos = set()
+if "bekeken_podcasts" not in st.session_state:
+    st.session_state.bekeken_podcasts = set()
 
-# --- BIBLIOTHEEK MET ECHTE YOUTUBE CODES ---
-YOUTUBE_POOL = [
-    # NEDERLANDS: Nerdland
-    {"podcast": "Nerdland Maandoverzicht", "titel": "Maandoverzicht Maart 2026", "yt_id": "89vY3XWclpE", "genre": "🔬 Wetenschap", "taal": "Nederlands", "minuten": 105},
-    {"podcast": "Nerdland Maandoverzicht", "titel": "Maandoverzicht Februari 2026", "yt_id": "E69A57V_b_8", "genre": "🔬 Wetenschap", "taal": "Nederlands", "minuten": 95},
-    {"podcast": "Nerdland", "titel": "Special: Kernenergie & Fusion", "yt_id": "u49w9R8wV7Y", "genre": "🔬 Wetenschap", "taal": "Nederlands", "minuten": 75},
-    
-    # NEDERLANDS: De Volksjury & Misdaad
-    {"podcast": "De Volksjury", "titel": "Aflevering 100 - Live Special", "yt_id": "h3_9f_fmx_M", "genre": "🕵️ Misdaad", "taal": "Nederlands", "minuten": 70},
-    {"podcast": "De Volksjury", "titel": "Aflevering 85 - Moord in de Polders", "yt_id": "Pz78V3uJ3l8", "genre": "🕵️ Misdaad", "taal": "Nederlands", "minuten": 60},
-    {"podcast": "Stemmen van Assisen", "titel": "De Kasteelmoord Reconstructie", "yt_id": "W9vPq4p5Y7M", "genre": "🕵️ Misdaad", "taal": "Nederlands", "minuten": 45},
-    {"podcast": "Volksjury Dossier", "titel": "De Horror-Huisarts", "yt_id": "b7vC3x8wM4k", "genre": "🕵️ Misdaad", "taal": "Nederlands", "minuten": 55},
-
-    # NEDERLANDS: Geschiedenis
-    {"podcast": "Geschiedenis van Vlaanderen", "titel": "De Guldensporenslag Mythe", "yt_id": "X4vW8_p9oLk", "genre": "🏰 Geschiedenis", "taal": "Nederlands", "minuten": 30},
-    {"podcast": "Universiteit van Vlaanderen", "titel": "Hoe dachten de ridders écht?", "yt_id": "Y3vA4_x9P_k", "genre": "🏰 Geschiedenis", "taal": "Nederlands", "minuten": 18},
-    
-    # ENGELS: Misdaad
-    {"podcast": "Rotten Mango", "titel": "The Case of the Missing Heiress", "yt_id": "m9P8vX4lQ7w", "genre": "🕵️ Misdaad", "taal": "Engels", "minuten": 85},
-    {"podcast": "JCS - Criminal Psychology", "titel": "The Legend of Jeff", "yt_id": "8-X7pJUY-G4", "genre": "🕵️ Misdaad", "taal": "Engels", "minuten": 52},
-    
-    # ENGELS: Wetenschap & Weetjes
-    {"podcast": "Veritasium", "titel": "The Scientific Way to Turn Back Time", "yt_id": "K6L8V_p9X8k", "genre": "🔬 Wetenschap & Weetjes", "taal": "Engels", "minuten": 24},
-    {"podcast": "Stuff You Should Know", "titel": "How Phobias Work", "yt_id": "w9v_P7x4Lko", "genre": "🔬 Wetenschap & Weetjes", "taal": "Engels", "minuten": 45}
+# --- BIBLIOTHEEK MET OFFICIËLE PLAYLIST LINKS ---
+# Deze links openen direct de échte series op YouTube die automatisch na elkaar afspelen!
+YOUTUBE_PLAYLISTS = [
+    {
+        "podcast": "Nerdland Maandoverzicht", 
+        "omschrijving": "Het meest actuele maandoverzicht vol wetenschapsnieuws met Lieven Scheire.", 
+        "playlist_url": "https://www.youtube.com/playlist?list=PL_Xv49g9VfKpK7hErc8LwN_6N_y-zIuUX", 
+        "genre": "🔬 Wetenschap", "taal": "Nederlands", "minuten": 100
+    },
+    {
+        "podcast": "De Volksjury", 
+        "omschrijving": "Vlaanderens populairste true-crime podcast over onopgeloste moordzaken.", 
+        "playlist_url": "https://www.youtube.com/playlist?list=PLG0Tf83uX9v0f_Z9X-76u7Wep_D2oF6U7", 
+        "genre": "🕵️ Misdaad", "taal": "Nederlands", "minuten": 60
+    },
+    {
+        "podcast": "De Stemmen van Assisen", 
+        "omschrijving": "Het Nieuwsblad blikt achter de schermen van de meest spraakmakende rechtszaken.", 
+        "playlist_url": "https://www.youtube.com/playlist?list=PLfO0hP_4Wb8vA7z_p7QeO6X5pT5V6_M3r", 
+        "genre": "🕵️ Misdaad", "taal": "Nederlands", "minuten": 45
+    },
+    {
+        "podcast": "Universiteit van Vlaanderen", 
+        "omschrijving": "Korte, boeiende colleges van topwetenschappers over uiteenlopende mysteries.", 
+        "playlist_url": "https://www.youtube.com/playlist?list=PL3v_B_bE_lU8-w_6S7Vf9AkeGbyUdfiPZ", 
+        "genre": "🏰 Geschiedenis & Wetenschap", "taal": "Nederlands", "minuten": 20
+    },
+    {
+        "podcast": "Stuff You Should Know (English)", 
+        "omschrijving": "De wereldberoemde podcast die werkelijk álles tot op de bodem uitzoekt.", 
+        "playlist_url": "https://www.youtube.com/playlist?list=PL_g3zK2g1X6W5qNf1RkCgV_xI-M_N-wIk", 
+        "genre": "🔬 Wetenschap & Weetjes", "taal": "Engels", "minuten": 45
+    },
+    {
+        "podcast": "Rotten Mango (English)", 
+        "omschrijving": "Diepgaande true-crime verhalen met een focus op psychologie en details.", 
+        "playlist_url": "https://www.youtube.com/playlist?list=PLwZ_D3M5_v7e3Z_XvKzW_jVbU_bXf0GvI", 
+        "genre": "🕵️ Misdaad", "taal": "Engels", "minuten": 80
+    }
 ]
 
 # --- SIDEBAR INTERFACE ---
 st.sidebar.header("⚙️ Jouw Reisvoorkeuren")
-minuten_beschikbaar = st.sidebar.slider("Hoeveel minuten duurt je rit?", 15, 360, 120, 15)
+minuten_beschikbaar = st.sidebar.slider("Hoeveel minuten duurt je rit ongeveer?", 15, 180, 60, 15)
 
 st.sidebar.write("### 🌍 Welke talen?")
 wil_nl = st.sidebar.checkbox("Nederlands 🇳🇱/🇧🇪", value=True)
 wil_en = st.sidebar.checkbox("Engels 🇬🇧/🇺🇸", value=True)
 
 st.sidebar.write("### 📂 Welke genres?")
-genres_beschikbaar = sorted(list(set(p["genre"] for p in YOUTUBE_POOL)))
+genres_beschikbaar = sorted(list(set(p["genre"] for p in YOUTUBE_PLAYLISTS)))
 gekozen_genres = []
 for g in genres_beschikbaar:
     if st.sidebar.checkbox(g, value=True):
         gekozen_genres.append(g)
 
 st.sidebar.write("---")
-if st.sidebar.button("🔀 Schud de kaarten voor een nieuwe mix"):
+if st.sidebar.button("🔀 Schud de kaarten voor een nieuwe show"):
     st.rerun()
 
-# --- FILTEREN EN SHUFFLEN ---
-mogelijke_mix = []
-for v in YOUTUBE_POOL:
-    # Check of het genre is aangevinkt
-    if v["genre"] not in gekozen_genres:
+# --- FILTEREN ---
+mogelijke_shows = []
+for p in YOUTUBE_PLAYLISTS:
+    if p["genre"] not in gekozen_genres:
         continue
-    # Check of de video al bekeken is
-    if v["titel"] in st.session_state.bekeken_videos:
+    if p["podcast"] in st.session_state.bekeken_podcasts:
         continue
-    # Check de taalvoorkeuren
-    if v["taal"] == "Nederlands" and not wil_nl:
+    if p["taal"] == "Nederlands" and not wil_nl:
         continue
-    if v["taal"] == "Engels" and not wil_en:
+    if p["taal"] == "Engels" and not wil_en:
         continue
         
-    mogelijke_mix.append(v)
+    mogelijke_shows.append(p)
 
-random.shuffle(mogelijke_mix)
+random.shuffle(mogelijke_shows)
 
-# --- PLAYLIST OPBOUWEN ---
-playlist = []
-totale_tijd = 0
+# --- SELECTEER EEN COOLE SHOW DIE BIJ JOUW TIJD PAST ---
+gekozen_show = None
+for show in mogelijke_shows:
+    # Zoek een show die mooi binnen je tijdslot past, of de beste match is
+    if show["minuten"] <= minuten_beschikbaar + 30:
+        gekozen_show = show
+        break
 
-for video in mogelijke_mix:
-    if totale_tijd + video["minuten"] <= minuten_beschikbaar:
-        playlist.append(video)
-        totale_tijd += video["minuten"]
+# Als er niks specifieks past, pakken we gewoon de eerste beschikbare show
+if not gekozen_show and mogelijke_shows:
+    gekozen_show = mogelijke_shows[0]
 
-# --- PLAYLIST GENEREREN EN INTERFACE ---
-col1, col2 = st.columns(2)
-with col1: st.metric(label="Aantal fragmenten", value=f"{len(playlist)} stuks")
-with col2: st.metric(label="Gevulde tijd", value=f"{totale_tijd} / {minuten_beschikbaar} min")
-
-if not playlist:
-    st.info("Geen video's gevonden. Vink meer opties aan of verhoog je tijd!")
+# --- INTERFACE WEERGEVEN ---
+if not gekozen_show:
+    st.info("Geen nieuwe podcasts gevonden. Vink meer genres aan of reset je geschiedenis!")
 else:
-    # De magische link bouwen voor YouTube
-    video_ids = [track["yt_id"] for track in playlist]
-    yt_playlist_url = f"https://www.youtube.com/watch_videos?video_ids={','.join(video_ids)}"
+    st.subheader("📋 Jouw Match voor deze Rit:")
     
-    # Grote opvallende knop voor de reismix
-    st.markdown(f'<a href="{yt_playlist_url}" target="_blank" class="playlist-button">🚀 Start Reismix in de YouTube-App (Speelt automatisch door!)</a>', unsafe_allow_html=True)
+    icoon = "🔬" if "Wetenschap" in gekozen_show['genre'] else "🕵️" if "Misdaad" in gekozen_show['genre'] else "🏰"
     
-    st.write("---")
-    st.subheader("📋 Inhoud van je huidige mix:")
-    
-    for i, track in enumerate(playlist, 1):
-        icoon = "🔬" if "Wetenschap" in track['genre'] else "🕵️" if "Misdaad" in track['genre'] else "🏰"
-        st.markdown(f"""
-            <div class="podcast-card">
-                <span style='color: #d1477a; font-weight: bold; text-transform: uppercase; font-size: 0.85em; letter-spacing: 1px;'>🌸 {track['podcast']}</span>
-                <h3 style='margin: 8px 0 12px 0; font-size: 1.25em;'>{i}. {track['titel']}</h3>
-                <span class="badge badge-genre">{icoon} {track['genre']}</span>
-                <span class="badge badge-lang">🌍 {track['taal']}</span>
-                <span class="badge badge-time">⏱️ {track['minuten']} min</span>
-            </div>
-        """, unsafe_allow_html=True)
+    st.markdown(f"""
+        <div class="podcast-card">
+            <span style='color: #d1477a; font-weight: bold; text-transform: uppercase; font-size: 0.85em; letter-spacing: 1px;'>🌸 {gekozen_show['podcast']}</span>
+            <h3 style='margin: 8px 0 8px 0; font-size: 1.35em;'>{gekozen_show['podcast']} Afspeellijst</h3>
+            <p style='color: #555; font-size: 0.95em; margin-bottom: 12px;'>{gekozen_show['omschrijving']}</p>
+            <span class="badge badge-genre">{icoon} {gekozen_show['genre']}</span>
+            <span class="badge badge-lang">🌍 {gekozen_show['taal']}</span>
+            <span class="badge badge-time">⏱️ Gem. {gekozen_show['minuten']} min</span>
+            <br><br>
+            <a href="{gekozen_show['playlist_url']}" target="_blank" class="playlist-button">🚀 Open deze Playlist in YouTube (Speelt automatisch door!)</a>
+        </div>
+    """, unsafe_allow_html=True)
 
-    if st.button("✔️ Markeer deze video's als bekeken"):
-        for track in playlist:
-            st.session_state.bekeken_videos.add(track["titel"])
-        st.success("Gemarkeerd! Deze afleveringen zijn uit je poule verwijderd.")
+    if st.button("✔️ Markeer deze podcast als gehoord voor vandaag"):
+        st.session_state.bekeken_podcasts.add(gekozen_show["podcast"])
+        st.success(f"Gemarkeerd! {gekozen_show['podcast']} is tijdelijk uit je keuzes gehaald.")
         st.rerun()
 
-if st.session_state.bekeken_videos:
+if st.session_state.bekeken_podcasts:
     st.sidebar.write("---")
     if st.sidebar.button("🔄 Geschiedenis wissen"):
-        st.session_state.bekeken_videos.clear()
+        st.session_state.bekeken_podcasts.clear()
         st.sidebar.success("Geschiedenis gereset!")
         st.rerun()
