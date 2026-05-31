@@ -32,29 +32,52 @@ st.title("🎙️ Mijn Live Podcast App")
 st.write("Jouw reistijd gevuld met échte, actuele podcasts van het internet.")
 st.write("---")
 
-# --- FUNCTIE: LIVE DE ECHTE PODCASTS OPHALEN VAN INTERNET ---
-def laad_live_podcasts():
-    # Hier zetten we de échte RSS-links in!
-    echte_feeds = {
-        "Nerdland Maandoverzicht": "https://feeds.soundcloud.com/users/soundcloud:users:274391696/sounds.rss",
-        "VRT Radio 1 Select": "https://rss.vrt.be/epub/manual/radio1_select.xml"
-    }
-    
+# --- FUNCTIE: DATABASE EN FEEDS LIVE OPZETTEN ---
+def database_en_feeds_initialiseren():
     connection = sqlite3.connect("podcasts.db")
     cursor = connection.cursor()
     
-    for titel, url in echte_feeds.items():
-        # Voeg de podcast toe (ID 5 voor Nerdland, ID 1 voor VRT)
-        pod_id = 5 if "Nerdland" in titel else 1
-        taal = "Nederlands"
-        
+    # Zorg dat de basis-tabellen sowieso bestaan
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS podcasts (
+            id INTEGER PRIMARY KEY, title TEXT, rss_url TEXT, description TEXT, language TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS genres (
+            id INTEGER PRIMARY KEY, name TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS podcast_genres (
+            podcast_id INTEGER, genre_id INTEGER, PRIMARY KEY (podcast_id, genre_id)
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS episodes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, podcast_id INTEGER, title TEXT, 
+            audio_url TEXT, duration_in_seconds INTEGER, pub_date TEXT, is_listened INTEGER DEFAULT 0
+        )
+    """)
+    
+    # Voeg de genres toe als ze er niet zijn
+    cursor.execute("INSERT OR IGNORE INTO genres (id, name) VALUES (1, 'Wetenschap')")
+    cursor.execute("INSERT OR IGNORE INTO genres (id, name) VALUES (3, 'Nieuws & Politiek')")
+    
+    # Echte feeds definieren
+    echte_feeds = {
+        5: ("Nerdland Maandoverzicht", "https://feeds.soundcloud.com/users/soundcloud:users:274391696/sounds.rss", 1), # Genre 1 = Wetenschap
+        1: ("VRT Radio 1 Select", "https://rss.vrt.be/epub/manual/radio1_select.xml", 3) # Genre 3 = Nieuws
+    }
+    
+    for pod_id, (titel, url, genre_id) in echte_feeds.items():
+        # Voeg de podcast toe aan de tabel
         cursor.execute("""
             INSERT OR IGNORE INTO podcasts (id, title, rss_url, description, language)
-            VALUES (?, ?, ?, 'Live podcast van internet.', ?)
-        """, (pod_id, titel, url, taal))
+            VALUES (?, ?, ?, 'Live podcast', 'Nederlands')
+        """, (pod_id, titel, url))
         
-        # Koppel aan genre (Nerdland = Wetenschap (1), VRT = Nieuws (3))
-        genre_id = 1 if pod_id == 5 else 3
+        # Koppel aan het genre
         cursor.execute("INSERT OR IGNORE INTO podcast_genres (podcast_id, genre_id) VALUES (?, ?)", (pod_id, genre_id))
         
         # Pluk de nieuwste 5 afleveringen live van internet
@@ -65,35 +88,38 @@ def laad_live_podcasts():
                 audio_url = entry.enclosures[0].href if entry.get('enclosures') else ""
                 pub_date = entry.get('published', '')
                 
-                # Bepaal de duur (Nerdland is vaak lang, we schatten op 1.5 uur als het ontbreekt)
-                duratie = entry.get('itunes_duration', 5400)
+                # Nerdland afleveringen zijn erg lang (~2 uur = 7200 seconden)
+                duratie = entry.get('itunes_duration', 7200)
                 try:
                     if ":" in str(duratie):
                         delen = list(map(int, duratie.split(':')))
                         if len(delen) == 3: seconden = delen[0]*3600 + delen[1]*60 + delen[2]
                         elif len(delen) == 2: seconden = delen[0]*60 + delen[1]
                     else: seconden = int(duratie)
-                except: seconden = 5400
+                except:
+                    seconden = 7200
                 
                 if audio_url:
                     cursor.execute("""
                         INSERT OR IGNORE INTO episodes (podcast_id, title, audio_url, duration_in_seconds, pub_date)
                         VALUES (?, ?, ?, ?, ?)
                     """, (pod_id, ep_titel, audio_url, seconden, pub_date))
-        except Exception as e:
+        except:
             pass
 
     connection.commit()
     connection.close()
 
-# Start de internet-synchronisatie zodra de website laadt!
-laad_live_podcasts()
+# Start de grote winterschoonmaak en live-import!
+database_en_feeds_initialiseren()
 
 # --- SIDEBAR INTERFACE ---
 st.sidebar.header("⚙️ Instellingen")
 taal = st.sidebar.radio("Welke taal?", ("Nederlands", "Engels"))
-minuten_beschikbaar = st.sidebar.slider("Hoeveel minuten heb je?", 10, 600, 180, 10) # Standaard naar 3 uur gezet voor Nerdland
-genre = st.sidebar.selectbox("Kies een genre:", ("Alles", "Wetenschap", "Misdaad", "Nieuws & Politiek"))
+
+# Tip: We zetten de schuifbalk standaard lekker hoog (300 min) en verhogen het maximum naar 12 uur zodat Nerdland altijd past!
+minuten_beschikbaar = st.sidebar.slider("Hoeveel minuten heb je?", 10, 720, 300, 10)
+genre = st.sidebar.selectbox("Kies een genre:", ("Alles", "Wetenschap", "Nieuws & Politiek"))
 
 # --- PLAYLIST LOGICA ---
 def genereer_slimme_playlist(beschikbare_minuten, gekozen_taal, gekozen_genre):
@@ -127,6 +153,8 @@ def genereer_slimme_playlist(beschikbare_minuten, gekozen_taal, gekozen_genre):
     totale_tijd_seconden = 0
     
     for ep_id, titel, duur, podcast_naam, audio_url in alle_afleveringen:
+        # Als de allereerste aflevering al groter is dan je totale budget, 
+        # springen we naar de volgende om te kijken of er een kortere wél past!
         if totale_tijd_seconden + duur <= beschikbare_seconden:
             playlist.append({
                 'id': ep_id, 'podcast': podcast_naam, 'aflevering': titel, 'minuten': round(duur / 60), 'url': audio_url
@@ -159,7 +187,7 @@ st.write(" ")
 st.subheader("📋 Jouw Persoonlijke Playlist")
 
 if not gekozen_playlist:
-    st.info("Geen onbeluisterde afleveringen. Pas je filters aan!")
+    st.info("Geen onbeluisterde afleveringen gevonden. Schuif je tijdslot verder open (Nerdland heeft veel tijd nodig!) of wissel van genre.")
 else:
     for i, track in enumerate(gekozen_playlist, 1):
         st.markdown(f"""
