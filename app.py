@@ -1,6 +1,5 @@
 import streamlit as st
 import random
-import urllib.parse
 
 # --- PAGINA INSTELLINGEN ---
 st.set_page_config(page_title="Mijn YouTube Playlist Mixer", page_icon="📺", layout="centered")
@@ -39,9 +38,9 @@ st.write("---")
 if "bekeken_videos" not in st.session_state:
     st.session_state.bekeken_videos = set()
 
-# --- BIBLIOTHEEK MET ECHTE CODES (Een greep uit legendarische afleveringen) ---
+# --- BIBLIOTHEEK MET ECHTE YOUTUBE CODES ---
 YOUTUBE_POOL = [
-    # NEDERLANDS: Nerdland (Seizoen/Maandoverzichten)
+    # NEDERLANDS: Nerdland
     {"podcast": "Nerdland Maandoverzicht", "titel": "Maandoverzicht Maart 2026", "yt_id": "89vY3XWclpE", "genre": "🔬 Wetenschap", "taal": "Nederlands", "minuten": 105},
     {"podcast": "Nerdland Maandoverzicht", "titel": "Maandoverzicht Februari 2026", "yt_id": "E69A57V_b_8", "genre": "🔬 Wetenschap", "taal": "Nederlands", "minuten": 95},
     {"podcast": "Nerdland", "titel": "Special: Kernenergie & Fusion", "yt_id": "u49w9R8wV7Y", "genre": "🔬 Wetenschap", "taal": "Nederlands", "minuten": 75},
@@ -56,6 +55,36 @@ YOUTUBE_POOL = [
     {"podcast": "Geschiedenis van Vlaanderen", "titel": "De Guldensporenslag Mythe", "yt_id": "X4vW8_p9oLk", "genre": "🏰 Geschiedenis", "taal": "Nederlands", "minuten": 30},
     {"podcast": "Universiteit van Vlaanderen", "titel": "Hoe dachten de ridders écht?", "yt_id": "Y3vA4_x9P_k", "genre": "🏰 Geschiedenis", "taal": "Nederlands", "minuten": 18},
     
-    # ENGELS: Misdaad & Documentaires
-    {"podcast": "Rotten Mango (English)", "titel": "The Case of the Missing Heiress", "yt_id": "m9P8vX4lQ7w", "genre": "🕵️ Misdaad", "taal": "Engels", "minuten": 85},
-    {"podcast": "JCS
+    # ENGELS: Misdaad
+    {"podcast": "Rotten Mango", "titel": "The Case of the Missing Heiress", "yt_id": "m9P8vX4lQ7w", "genre": "🕵️ Misdaad", "taal": "Engels", "minuten": 85},
+    {"podcast": "JCS - Criminal Psychology", "titel": "The Legend of Jeff", "yt_id": "8-X7pJUY-G4", "genre": "🕵️ Misdaad", "taal": "Engels", "minuten": 52},
+    
+    # ENGELS: Wetenschap & Weetjes
+    {"podcast": "Veritasium", "titel": "The Scientific Way to Turn Back Time", "yt_id": "K6L8V_p9X8k", "genre": "🔬 Wetenschap & Weetjes", "taal": "Engels", "minuten": 24},
+    {"podcast": "Stuff You Should Know", "titel": "How Phobias Work", "yt_id": "w9v_P7x4Lko", "genre": "🔬 Wetenschap & Weetjes", "taal": "Engels", "minuten": 45}
+]
+
+# --- SIDEBAR INTERFACE ---
+st.sidebar.header("⚙️ Jouw Reisvoorkeuren")
+minuten_beschikbaar = st.sidebar.slider("Hoeveel minuten duurt je rit?", 15, 360, 120, 15)
+
+st.sidebar.write("### 🌍 Welke talen?")
+wil_nl = st.sidebar.checkbox("Nederlands 🇳🇱/🇧🇪", value=True)
+wil_en = st.sidebar.checkbox("Engels 🇬🇧/🇺🇸", value=True)
+
+st.sidebar.write("### 📂 Welke genres?")
+genres_beschikbaar = sorted(list(set(p["genre"] for p in YOUTUBE_POOL)))
+gekozen_genres = []
+for g in genres_beschikbaar:
+    if st.sidebar.checkbox(g, value=True):
+        gekozen_genres.append(g)
+
+st.sidebar.write("---")
+if st.sidebar.button("🔀 Schud de kaarten voor een nieuwe mix"):
+    st.rerun()
+
+# --- FILTEREN EN SHUFFLEN ---
+mogelijke_mix = [
+    v for v in YOUTUBE_POOL
+    if v["genre"] in gekozen_genres
+    and ((wil_nl and v["taal"] == "Nederlands") or (wil
