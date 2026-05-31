@@ -82,14 +82,14 @@ def database_en_feeds_initialiseren():
     
     # Mocht de cloud-server geblokkeerd worden door SoundCloud/VRT, 
     # dan stoppen we hier direct échte, werkende audio-links van recente afleveringen in!
-    back-up_afleveringen = [
+    backup_afleveringen = [
         (5, "Nerdland Maandoverzicht - Mei 2026", "https://feeds.soundcloud.com/stream/1715424519-soundcloud-users-274391696-nerdland-mei-2026.mp3", 7800, "2026-05-31"),
         (5, "Nerdland Maandoverzicht - April 2026", "https://feeds.soundcloud.com/stream/1715424518-soundcloud-users-274391696-nerdland-april-2026.mp3", 7200, "2026-04-30"),
         (1, "VRT Radio 1 Select: Het Coronavirus & De Wetenschap", "https://freemp3cloud.com/files/test.mp3", 900, "2026-05-28"),
         (1, "VRT Nieuwspodcast: Analyse van de actualiteit", "https://freemp3cloud.com/files/test.mp3", 1200, "2026-05-29")
     ]
     
-    for pod_id, ep_titel, audio_url, seconden, pub_date in back-up_afleveringen:
+    for pod_id, ep_titel, audio_url, seconden, pub_date in backup_afleveringen:
         cursor.execute("""
             INSERT OR IGNORE INTO episodes (podcast_id, title, audio_url, duration_in_seconds, pub_date)
             VALUES (?, ?, ?, ?, ?)
