@@ -84,7 +84,72 @@ if st.sidebar.button("🔀 Schud de kaarten voor een nieuwe mix"):
     st.rerun()
 
 # --- FILTEREN EN SHUFFLEN ---
-mogelijke_mix = [
-    v for v in YOUTUBE_POOL
-    if v["genre"] in gekozen_genres
-    and ((wil_nl and v["taal"] == "Nederlands") or (wil
+mogelijke_mix = []
+for v in YOUTUBE_POOL:
+    # Check of het genre is aangevinkt
+    if v["genre"] not in gekozen_genres:
+        continue
+    # Check of de video al bekeken is
+    if v["titel"] in st.session_state.bekeken_videos:
+        continue
+    # Check de taalvoorkeuren
+    if v["taal"] == "Nederlands" and not wil_nl:
+        continue
+    if v["taal"] == "Engels" and not wil_en:
+        continue
+        
+    mogelijke_mix.append(v)
+
+random.shuffle(mogelijke_mix)
+
+# --- PLAYLIST OPBOUWEN ---
+playlist = []
+totale_tijd = 0
+
+for video in mogelijke_mix:
+    if totale_tijd + video["minuten"] <= minuten_beschikbaar:
+        playlist.append(video)
+        totale_tijd += video["minuten"]
+
+# --- PLAYLIST GENEREREN EN INTERFACE ---
+col1, col2 = st.columns(2)
+with col1: st.metric(label="Aantal fragmenten", value=f"{len(playlist)} stuks")
+with col2: st.metric(label="Gevulde tijd", value=f"{totale_tijd} / {minuten_beschikbaar} min")
+
+if not playlist:
+    st.info("Geen video's gevonden. Vink meer opties aan of verhoog je tijd!")
+else:
+    # De magische link bouwen voor YouTube
+    video_ids = [track["yt_id"] for track in playlist]
+    yt_playlist_url = f"https://www.youtube.com/watch_videos?video_ids={','.join(video_ids)}"
+    
+    # Grote opvallende knop voor de reismix
+    st.markdown(f'<a href="{yt_playlist_url}" target="_blank" class="playlist-button">🚀 Start Reismix in de YouTube-App (Speelt automatisch door!)</a>', unsafe_allow_html=True)
+    
+    st.write("---")
+    st.subheader("📋 Inhoud van je huidige mix:")
+    
+    for i, track in enumerate(playlist, 1):
+        icoon = "🔬" if "Wetenschap" in track['genre'] else "🕵️" if "Misdaad" in track['genre'] else "🏰"
+        st.markdown(f"""
+            <div class="podcast-card">
+                <span style='color: #d1477a; font-weight: bold; text-transform: uppercase; font-size: 0.85em; letter-spacing: 1px;'>🌸 {track['podcast']}</span>
+                <h3 style='margin: 8px 0 12px 0; font-size: 1.25em;'>{i}. {track['titel']}</h3>
+                <span class="badge badge-genre">{icoon} {track['genre']}</span>
+                <span class="badge badge-lang">🌍 {track['taal']}</span>
+                <span class="badge badge-time">⏱️ {track['minuten']} min</span>
+            </div>
+        """, unsafe_allow_html=True)
+
+    if st.button("✔️ Markeer deze video's als bekeken"):
+        for track in playlist:
+            st.session_state.bekeken_videos.add(track["titel"])
+        st.success("Gemarkeerd! Deze afleveringen zijn uit je poule verwijderd.")
+        st.rerun()
+
+if st.session_state.bekeken_videos:
+    st.sidebar.write("---")
+    if st.sidebar.button("🔄 Geschiedenis wissen"):
+        st.session_state.bekeken_videos.clear()
+        st.sidebar.success("Geschiedenis gereset!")
+        st.rerun()
