@@ -1,5 +1,6 @@
 import streamlit as st
 import urllib.request
+import urllib.parse
 import json
 import random
 
@@ -41,7 +42,6 @@ if "beluisterde_titels" not in st.session_state:
     st.session_state.beluisterde_titels = set()
 
 # --- DE INTERNATIONALE PODCAST LIJST ---
-# We hebben de feeds stabieler gemaakt en extra Engelse/Nederlandse toppers toegevoegd!
 PODCASTS = [
     {"naam": "Nerdland Maandoverzicht", "url": "https://feeds.soundcloud.com/users/soundcloud:users:274391696/sounds.rss", "genre": "🔬 Wetenschap", "taal": "Nederlands", "duur": 120},
     {"naam": "De Volksjury", "url": "https://feeds.pubsub.club/devolksjury.xml", "genre": "🕵️ Misdaad", "taal": "Nederlands", "duur": 65},
@@ -72,5 +72,18 @@ st.sidebar.write("---")
 if st.sidebar.button("🔀 Schud de kaarten voor een nieuwe mix"):
     st.rerun()
 
-# --- BLOKKADE-VRIJE PARSER (Met behulp van een internet-tussendeur) ---
-@st.cache_data(ttl=900) #
+# --- BLOKKADE-VRIJE PARSER ---
+def haal_alle_afleveringen_veilig_op():
+    alle_items = []
+    
+    for p in PODCASTS:
+        try:
+            # Internet-tussendeur om serverblokkades te omzeilen
+            veilig_url = f"https://api.rss2json.com/v1/api.json?rss_url={urllib.parse.quote(p['url'])}"
+            
+            req = urllib.request.Request(veilig_url, headers={'User-Agent': 'Mozilla/5.0'})
+            response = urllib.request.urlopen(req)
+            data = json.loads(response.read().decode())
+            
+            if data.get("status") == "ok":
+                # We trek
