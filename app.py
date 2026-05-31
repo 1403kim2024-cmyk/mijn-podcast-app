@@ -5,7 +5,7 @@ import feedparser
 # --- PAGINA INSTELLINGEN ---
 st.set_page_config(page_title="Mijn Ultieme Podcast App", page_icon="🎙️", layout="centered")
 
-# --- CUSTOM CSS STYLING (Roze & Appelblauwzeegroen) ---
+# --- CUSTOM CSS STYLING ---
 st.markdown("""
     <style>
     .stApp { background-color: #fcf8fa; }
@@ -32,12 +32,23 @@ st.title("🎙️ Mijn Live Podcast App")
 st.write("Jouw reistijd gevuld met échte, actuele podcasts van het internet.")
 st.write("---")
 
+# --- INTERNE FUNCTIE: RESET DATABASE ---
+def wis_en_herstel_database():
+    connection = sqlite3.connect("podcasts.db")
+    cursor = connection.cursor()
+    # Gooi de oude tabellen weg zodat we écht vanaf nul beginnen
+    cursor.execute("DROP TABLE IF EXISTS episodes")
+    cursor.execute("DROP TABLE IF EXISTS podcast_genres")
+    cursor.execute("DROP TABLE IF EXISTS podcasts")
+    cursor.execute("DROP TABLE IF EXISTS genres")
+    connection.commit()
+    connection.close()
+
 # --- FUNCTIE: DATABASE EN FEEDS LIVE OPZETTEN ---
 def database_en_feeds_initialiseren():
     connection = sqlite3.connect("podcasts.db")
     cursor = connection.cursor()
     
-    # Zorg dat de basis-tabellen sowieso bestaan
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS podcasts (
             id INTEGER PRIMARY KEY, title TEXT, rss_url TEXT, description TEXT, language TEXT
@@ -60,27 +71,22 @@ def database_en_feeds_initialiseren():
         )
     """)
     
-    # Voeg de genres toe als ze er niet zijn
     cursor.execute("INSERT OR IGNORE INTO genres (id, name) VALUES (1, 'Wetenschap')")
     cursor.execute("INSERT OR IGNORE INTO genres (id, name) VALUES (3, 'Nieuws & Politiek')")
     
-    # Echte feeds definieren
     echte_feeds = {
-        5: ("Nerdland Maandoverzicht", "https://feeds.soundcloud.com/users/soundcloud:users:274391696/sounds.rss", 1), # Genre 1 = Wetenschap
-        1: ("VRT Radio 1 Select", "https://rss.vrt.be/epub/manual/radio1_select.xml", 3) # Genre 3 = Nieuws
+        5: ("Nerdland Maandoverzicht", "https://feeds.soundcloud.com/users/soundcloud:users:274391696/sounds.rss", 1),
+        1: ("VRT Radio 1 Select", "https://rss.vrt.be/epub/manual/radio1_select.xml", 3)
     }
     
     for pod_id, (titel, url, genre_id) in echte_feeds.items():
-        # Voeg de podcast toe aan de tabel
         cursor.execute("""
             INSERT OR IGNORE INTO podcasts (id, title, rss_url, description, language)
             VALUES (?, ?, ?, 'Live podcast', 'Nederlands')
         """, (pod_id, titel, url))
         
-        # Koppel aan het genre
         cursor.execute("INSERT OR IGNORE INTO podcast_genres (podcast_id, genre_id) VALUES (?, ?)", (pod_id, genre_id))
         
-        # Pluk de nieuwste 5 afleveringen live van internet
         try:
             feed = feedparser.parse(url)
             for entry in feed.entries[:5]:
@@ -88,8 +94,8 @@ def database_en_feeds_initialiseren():
                 audio_url = entry.enclosures[0].href if entry.get('enclosures') else ""
                 pub_date = entry.get('published', '')
                 
-                # Nerdland afleveringen zijn erg lang (~2 uur = 7200 seconden)
-                duratie = entry.get('itunes_duration', 7200)
+                # We zetten de standaardduur nu lekker ruim op 90 minuten (5400 sec)
+                duratie = entry.get('itunes_duration', 5400)
                 try:
                     if ":" in str(duratie):
                         delen = list(map(int, duratie.split(':')))
@@ -97,7 +103,7 @@ def database_en_feeds_initialiseren():
                         elif len(delen) == 2: seconden = delen[0]*60 + delen[1]
                     else: seconden = int(duratie)
                 except:
-                    seconden = 7200
+                    seconden = 5400
                 
                 if audio_url:
                     cursor.execute("""
@@ -110,16 +116,20 @@ def database_en_feeds_initialiseren():
     connection.commit()
     connection.close()
 
-# Start de grote winterschoonmaak en live-import!
-database_en_feeds_initialiseren()
-
 # --- SIDEBAR INTERFACE ---
 st.sidebar.header("⚙️ Instellingen")
 taal = st.sidebar.radio("Welke taal?", ("Nederlands", "Engels"))
-
-# Tip: We zetten de schuifbalk standaard lekker hoog (300 min) en verhogen het maximum naar 12 uur zodat Nerdland altijd past!
 minuten_beschikbaar = st.sidebar.slider("Hoeveel minuten heb je?", 10, 720, 300, 10)
 genre = st.sidebar.selectbox("Kies een genre:", ("Alles", "Wetenschap", "Nieuws & Politiek"))
+
+st.sidebar.write("---")
+st.sidebar.write("⚠️ **Probleemoplosser**")
+if st.sidebar.button("💥 Wis & Reset Database online"):
+    wis_en_herstel_database()
+    st.sidebar.success("Database is online schoongeveegd! Ververs nu de pagina.")
+
+# Start de import
+database_en_feeds_initialiseren()
 
 # --- PLAYLIST LOGICA ---
 def genereer_slimme_playlist(beschikbare_minuten, gekozen_taal, gekozen_genre):
@@ -153,8 +163,6 @@ def genereer_slimme_playlist(beschikbare_minuten, gekozen_taal, gekozen_genre):
     totale_tijd_seconden = 0
     
     for ep_id, titel, duur, podcast_naam, audio_url in alle_afleveringen:
-        # Als de allereerste aflevering al groter is dan je totale budget, 
-        # springen we naar de volgende om te kijken of er een kortere wél past!
         if totale_tijd_seconden + duur <= beschikbare_seconden:
             playlist.append({
                 'id': ep_id, 'podcast': podcast_naam, 'aflevering': titel, 'minuten': round(duur / 60), 'url': audio_url
@@ -187,7 +195,7 @@ st.write(" ")
 st.subheader("📋 Jouw Persoonlijke Playlist")
 
 if not gekozen_playlist:
-    st.info("Geen onbeluisterde afleveringen gevonden. Schuif je tijdslot verder open (Nerdland heeft veel tijd nodig!) of wissel van genre.")
+    st.info("Geen onbeluisterde afleveringen gevonden. Schuif je tijdslot verder open (Nerdland heeft veel tijd nodig!) of klik links op de grote 'Wis & Reset' knop.")
 else:
     for i, track in enumerate(gekozen_playlist, 1):
         st.markdown(f"""
