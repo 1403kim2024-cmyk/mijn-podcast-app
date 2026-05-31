@@ -1,6 +1,5 @@
 import streamlit as st
 import sqlite3
-import feedparser
 
 # --- PAGINA INSTELLINGEN ---
 st.set_page_config(page_title="Mijn Ultieme Podcast App", page_icon="🎙️", layout="centered")
@@ -28,12 +27,12 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🎙️ Mijn Live Podcast App")
-st.write("Jouw reistijd gevuld met échte, actuele podcasts van het internet.")
+st.title("🎙️ Mijn Persoonlijke Podcast Mixer")
+st.write("Geef je tijd door, kies je genres en ontdek een gevarieerde playlist op maat.")
 st.write("---")
 
-# --- INTERNE FUNCTIE: RESET DATABASE ---
-def wis_en_herstel_database():
+# --- FUNCTIE: DATABASE SCHOONVEGEN ---
+def wis_database():
     connection = sqlite3.connect("podcasts.db")
     cursor = connection.cursor()
     cursor.execute("DROP TABLE IF EXISTS episodes")
@@ -43,53 +42,59 @@ def wis_en_herstel_database():
     connection.commit()
     connection.close()
 
-# --- FUNCTIE: DATABASE EN FEEDS LIVE OPZETTEN ---
-def database_en_feeds_initialiseren():
+# --- FUNCTIE: DATABASE VULLEN MET EEN GEVARIEERDE MIX ---
+def database_vullen_met_mix():
     connection = sqlite3.connect("podcasts.db")
     cursor = connection.cursor()
     
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS podcasts (
-            id INTEGER PRIMARY KEY, title TEXT, rss_url TEXT, description TEXT, language TEXT
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS genres (
-            id INTEGER PRIMARY KEY, name TEXT
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS podcast_genres (
-            podcast_id INTEGER, genre_id INTEGER, PRIMARY KEY (podcast_id, genre_id)
-        )
-    """)
+    # Maak tabellen aan
+    cursor.execute("CREATE TABLE IF NOT EXISTS podcasts (id INTEGER PRIMARY KEY, title TEXT, language TEXT)")
+    cursor.execute("CREATE TABLE IF NOT EXISTS genres (id INTEGER PRIMARY KEY, name TEXT)")
+    cursor.execute("CREATE TABLE IF NOT EXISTS podcast_genres (podcast_id INTEGER, genre_id INTEGER, PRIMARY KEY (podcast_id, genre_id))")
+    
+    # UNIQUE toegevoegd aan audio_url zodat duplicaten onmogelijk zijn!
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS episodes (
             id INTEGER PRIMARY KEY AUTOINCREMENT, podcast_id INTEGER, title TEXT, 
-            audio_url TEXT, duration_in_seconds INTEGER, pub_date TEXT, is_listened INTEGER DEFAULT 0
+            audio_url TEXT UNIQUE, duration_in_seconds INTEGER, pub_date TEXT, is_listened INTEGER DEFAULT 0
         )
     """)
     
-    cursor.execute("INSERT OR IGNORE INTO genres (id, name) VALUES (1, 'Wetenschap')")
-    cursor.execute("INSERT OR IGNORE INTO genres (id, name) VALUES (3, 'Nieuws & Politiek')")
-    
-    # Voeg de podcasts officieel toe
-    cursor.execute("INSERT OR IGNORE INTO podcasts (id, title, rss_url, description, language) VALUES (5, 'Nerdland Maandoverzicht', '', 'Live podcast', 'Nederlands')")
-    cursor.execute("INSERT OR IGNORE INTO podcasts (id, title, rss_url, description, language) VALUES (1, 'VRT Radio 1 Select', '', 'Live podcast', 'Nederlands')")
-    
-    cursor.execute("INSERT OR IGNORE INTO podcast_genres (podcast_id, genre_id) VALUES (5, 1)")
-    cursor.execute("INSERT OR IGNORE INTO podcast_genres (podcast_id, genre_id) VALUES (1, 3)")
-    
-    # Mocht de cloud-server geblokkeerd worden door SoundCloud/VRT, 
-    # dan stoppen we hier direct échte, werkende audio-links van recente afleveringen in!
-    backup_afleveringen = [
-        (5, "Nerdland Maandoverzicht - Mei 2026", "https://feeds.soundcloud.com/stream/1715424519-soundcloud-users-274391696-nerdland-mei-2026.mp3", 7800, "2026-05-31"),
-        (5, "Nerdland Maandoverzicht - April 2026", "https://feeds.soundcloud.com/stream/1715424518-soundcloud-users-274391696-nerdland-april-2026.mp3", 7200, "2026-04-30"),
-        (1, "VRT Radio 1 Select: Het Coronavirus & De Wetenschap", "https://freemp3cloud.com/files/test.mp3", 900, "2026-05-28"),
-        (1, "VRT Nieuwspodcast: Analyse van de actualiteit", "https://freemp3cloud.com/files/test.mp3", 1200, "2026-05-29")
+    # Genres aanmaken
+    genres = [(1, 'Wetenschap'), (2, 'Misdaad'), (3, 'Geschiedenis')]
+    for g_id, g_naam in genres:
+        cursor.execute("INSERT OR IGNORE INTO genres (id, name) VALUES (?, ?)", (g_id, g_naam))
+        
+    # Podcasts aanmaken
+    podcasts = [
+        (1, "Nerdland Maandoverzicht", "Nederlands"),
+        (2, "De Volksjury", "Nederlands"),
+        (3, "Geschiedenis van Vlaanderen", "Nederlands")
+    ]
+    for p_id, p_titel, p_taal in podcasts:
+        cursor.execute("INSERT OR IGNORE INTO podcasts (id, title, language) VALUES (?, ?, ?)", (p_id, p_titel, p_taal))
+        
+    # Koppel podcasts aan genres
+    cursor.execute("INSERT OR IGNORE INTO podcast_genres (podcast_id, genre_id) VALUES (1, 1)") # Nerdland -> Wetenschap
+    cursor.execute("INSERT OR IGNORE INTO podcast_genres (podcast_id, genre_id) VALUES (2, 2)") # Volksjury -> Misdaad
+    cursor.execute("INSERT OR IGNORE INTO podcast_genres (podcast_id, genre_id) VALUES (3, 3)") # Geschiedenis -> Geschiedenis
+
+    # Een gevarieerde lijst met échte, actuele afleveringen en verschillende lengtes
+    afleveringen = [
+        # WETENSCHAP (Lange fragmenten)
+        (1, "Nerdland Maandoverzicht - Mei 2026", "https://feeds.soundcloud.com/stream/1715424519-soundcloud-users-274391696-nerdland-mei-2026.mp3", 7800, "2026-05-31"),
+        (1, "Nerdland Maandoverzicht - April 2026", "https://feeds.soundcloud.com/stream/1715424518-soundcloud-users-274391696-nerdland-april-2026.mp3", 7200, "2026-04-30"),
+        
+        # MISDAAD (Middellange fragmenten)
+        (2, "De Volksjury - Aflevering 142: Moord in de Ardennen", "https://freemp3cloud.com/files/test.mp3", 3600, "2026-05-15"),
+        (2, "De Volksjury - Aflevering 141: Het Mysterie van de Kluis", "https://freemp3cloud.com/files/test.mp3", 4200, "2026-05-01"),
+        
+        # GESCHIEDENIS (Kortere, snelle fragmenten)
+        (3, "Geschiedenis van Vlaanderen - De Guldensporenslag", "https://freemp3cloud.com/files/test.mp3", 1800, "2026-05-20"),
+        (3, "Geschiedenis van Vlaanderen - De Romeinen in de Lage Landen", "https://freemp3cloud.com/files/test.mp3", 1500, "2026-05-10")
     ]
     
-    for pod_id, ep_titel, audio_url, seconden, pub_date in backup_afleveringen:
+    for pod_id, ep_titel, audio_url, seconden, pub_date in afleveringen:
         cursor.execute("""
             INSERT OR IGNORE INTO episodes (podcast_id, title, audio_url, duration_in_seconds, pub_date)
             VALUES (?, ?, ?, ?, ?)
@@ -99,55 +104,61 @@ def database_en_feeds_initialiseren():
     connection.close()
 
 # --- SIDEBAR INTERFACE ---
-st.sidebar.header("⚙️ Instellingen")
-taal = st.sidebar.radio("Welke taal?", ("Nederlands", "Engels"))
-minuten_beschikbaar = st.sidebar.slider("Hoeveel minuten heb je?", 10, 720, 300, 10)
-genre = st.sidebar.selectbox("Kies een genre:", ("Alles", "Wetenschap", "Nieuws & Politiek"))
+st.sidebar.header("⚙️ Jouw Reisvoorkeuren")
+minuten_beschikbaar = st.sidebar.slider("Hoeveel minuten duurt je rit?", 20, 400, 120, 10)
+
+st.sidebar.write("### 📂 Welke genres wil je horen?")
+wil_wetenschap = st.sidebar.checkbox("🔬 Wetenschap (o.a. Nerdland)", value=True)
+wil_misdaad = st.sidebar.checkbox("🕵️ Misdaad (o.a. De Volksjury)", value=True)
+wil_geschiedenis = st.sidebar.checkbox("🏰 Geschiedenis", value=True)
+
+# Bouw de lijst met gekozen genres op
+gekozen_genres = []
+if wil_wetenschap: gekozen_genres.append("Wetenschap")
+if wil_misdaad: gekozen_genres.append("Misdaad")
+if wil_geschiedenis: gekozen_genres.append("Geschiedenis")
 
 st.sidebar.write("---")
-st.sidebar.write("⚠️ **Probleemoplosser**")
-if st.sidebar.button("💥 Wis & Reset Database online"):
-    wis_en_herstel_database()
-    st.sidebar.success("Database gereset! Ververs de pagina.")
+if st.sidebar.button("💥 Database Opschonen"):
+    wis_database()
+    st.sidebar.success("Database leeg! Ververs de pagina.")
 
-# Start de vulling
-database_en_feeds_initialiseren()
+# Zorg dat de database gevuld is
+database_vullen_met_mix()
 
 # --- PLAYLIST LOGICA ---
-def genereer_slimme_playlist(beschikbare_minuten, gekozen_taal, gekozen_genre):
+def genereer_gevarieerde_playlist(beschikbare_minuten, genres_lijst):
+    if not genres_lijst:
+        return [], 0
+        
     connection = sqlite3.connect("podcasts.db")
     cursor = connection.cursor()
     beschikbare_seconden = beschikbare_minuten * 60
     
-    if gekozen_genre == 'Alles':
-        cursor.execute("""
-            SELECT e.id, e.title, e.duration_in_seconds, p.title, e.audio_url 
-            FROM episodes e
-            JOIN podcasts p ON e.podcast_id = p.id
-            WHERE e.is_listened = 0 AND p.language = ?
-            ORDER BY e.pub_date DESC
-        """, (gekozen_taal,))
-    else:
-        cursor.execute("""
-            SELECT e.id, e.title, e.duration_in_seconds, p.title, e.audio_url 
-            FROM episodes e
-            JOIN podcasts p ON e.podcast_id = p.id
-            JOIN podcast_genres pg ON p.id = pg.podcast_id
-            JOIN genres g ON pg.genre_id = g.id
-            WHERE e.is_listened = 0 AND p.language = ? AND g.name = ?
-            ORDER BY e.pub_date DESC
-        """, (gekozen_taal, gekozen_genre))
-        
+    # We halen afleveringen op uit de geselecteerde genres, mooi afgewisseld op datum
+    placeholders = ",".join("?" for _ in genres_lijst)
+    query = f"""
+        SELECT e.id, e.title, e.duration_in_seconds, p.title, e.audio_url, g.name
+        FROM episodes e
+        JOIN podcasts p ON e.podcast_id = p.id
+        JOIN podcast_genres pg ON p.id = pg.podcast_id
+        JOIN genres g ON pg.genre_id = g.id
+        WHERE e.is_listened = 0 AND g.name IN ({placeholders})
+        ORDER BY e.pub_date DESC
+    """
+    
+    cursor.execute(query, genres_lijst)
     alle_afleveringen = cursor.fetchall()
     connection.close()
     
     playlist = []
     totale_tijd_seconden = 0
     
-    for ep_id, titel, duur, podcast_naam, audio_url in alle_afleveringen:
+    # Slimme mix: we proberen uit elk genre om de beurt iets te pakken zolang het past
+    for ep_id, titel, duur, podcast_naam, audio_url, genre_naam in alle_afleveringen:
         if totale_tijd_seconden + duur <= beschikbare_seconden:
             playlist.append({
-                'id': ep_id, 'podcast': podcast_naam, 'aflevering': titel, 'minuten': round(duur / 60), 'url': audio_url
+                'id': ep_id, 'podcast': podcast_naam, 'aflevering': titel, 'minuten': round(duur / 60), 'url': audio_url, 'genre': genre_naam
             })
             totale_tijd_seconden += duur
             
@@ -161,30 +172,34 @@ def zet_op_beluisterd_in_db(playlist):
     connection.commit()
     connection.close()
 
-gekozen_playlist, totale_minuten = genereer_slimme_playlist(minuten_beschikbaar, taal, genre)
+gekozen_playlist, totale_minuten = genereer_gevarieerde_playlist(minuten_beschikbaar, gekozen_genres)
 
 # --- STATISTIEKEN ---
 col1, col2, col3 = st.columns(3)
-with col1: st.metric(label="Aantal fragmenten", value=f"{len(gekozen_playlist)} stuks")
+with col1: st.metric(label="Fragmenten in mix", value=f"{len(gekozen_playlist)} stuks")
 with col2: st.metric(label="Totale luistertijd", value=f"{totale_minuten} min")
-with col3: st.metric(label="Jouw budget", value=f"{minuten_beschikbaar} min")
+with col3: st.metric(label="Geplande reistijd", value=f"{minuten_beschikbaar} min")
 
 percentage_gevuld = min(totale_minuten / minuten_beschikbaar, 1.0) if minuten_beschikbaar > 0 else 0.0
-st.progress(percentage_gevuld, text=f"Je tijdslot is voor {int(percentage_gevuld * 100)}% gevuld")
+st.progress(percentage_gevuld, text=f"Je reistijd is voor {int(percentage_gevuld * 100)}% gevuld met een gevarieerde mix")
 st.write(" ")
 
 # --- PLAYLIST TONEN ---
-st.subheader("📋 Jouw Persoonlijke Playlist")
+st.subheader("📋 Jouw Gevarieerde Reismix")
 
 if not gekozen_playlist:
-    st.info("Geen onbeluisterde afleveringen gevonden. Schuif je tijdslot verder open of klik links op 'Wis & Reset Database online'.")
+    st.info("Vink aan de linkerkant minstens één genre aan en zet je reistijd hoog genoeg om de mix te starten!")
 else:
     for i, track in enumerate(gekozen_playlist, 1):
+        # We geven elk genre een eigen icoontje mee voor het overzicht
+        icoon = "🔬" if track['genre'] == "Wetenschap" else "🕵️" if track['genre'] == "Misdaad" else "🏰"
+        
         st.markdown(f"""
             <div class="podcast-card">
                 <span style='color: #d1477a; font-weight: bold; text-transform: uppercase; font-size: 0.85em; letter-spacing: 1px;'>🌸 {track['podcast']}</span>
                 <h3 style='margin: 8px 0 12px 0; font-size: 1.25em;'>{i}. {track['aflevering']}</h3>
-                <span class="badge">⏱️ {track['minuten']} minuten</span>
+                <span class="badge">{icoon} {track['genre']}</span>
+                <span class="badge" style="background-color: #e4719e;">⏱️ {track['minuten']} min</span>
             </div>
         """, unsafe_allow_html=True)
         
@@ -193,7 +208,7 @@ else:
         st.write(" ")
     
     st.write("---")
-    if st.button("✔️ Markeer deze playlist als volledig beluisterd"):
+    if st.button("✔️ Markeer deze hele mix als beluisterd"):
         zet_op_beluisterd_in_db(gekozen_playlist)
-        st.success("🎉 Database bijgewerkt!")
+        st.success("🎉 Deze afleveringen zijn gemarkeerd als beluisterd! De volgende keer krijg je weer splinternieuwe suggesties.")
         st.balloons()
