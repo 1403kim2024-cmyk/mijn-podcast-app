@@ -7,7 +7,7 @@ import random
 # --- PAGINA INSTELLINGEN ---
 st.set_page_config(page_title="Mijn Ultieme Podcast Mixer", page_icon="🎙️", layout="centered")
 
-# --- CUSTOM CSS STYLING (Roze & Appelblauwzeegroen) ---
+# --- CUSTOM CSS STYLING ---
 st.markdown("""
     <style>
     .stApp { background-color: #fcf8fa; }
@@ -78,12 +78,90 @@ def haal_alle_afleveringen_veilig_op():
     
     for p in PODCASTS:
         try:
-            # Internet-tussendeur om serverblokkades te omzeilen
             veilig_url = f"https://api.rss2json.com/v1/api.json?rss_url={urllib.parse.quote(p['url'])}"
-            
             req = urllib.request.Request(veilig_url, headers={'User-Agent': 'Mozilla/5.0'})
             response = urllib.request.urlopen(req)
             data = json.loads(response.read().decode())
             
             if data.get("status") == "ok":
-                # We trek
+                for item in data.get("items", [])[:10]:
+                    audio_url = item.get("enclosure", {}).get("link", "")
+                    if not audio_url and "media:content" in item:
+                        audio_url = item["media:content"].get("url", "")
+                    
+                    if audio_url:
+                        alle_items.append({
+                            "podcast": p["naam"],
+                            "titel": item.get("title", ""),
+                            "url": audio_url,
+                            "genre": p["genre"],
+                            "taal": p["taal"],
+                            "minuten": p["duur"]
+                        })
+        except:
+            pass
+            
+    return alle_items
+
+# Trek direct de actuele lijst live binnen
+alle_afleveringen = haal_alle_afleveringen_veilig_op()
+
+# --- FILTEREN OP JOUW VOORKEUREN ---
+mogelijke_mix = [
+    a for a in alle_afleveringen
+    if a["genre"] in gekozen_genres
+    and ((wil_nl and a["taal"] == "Nederlands") or (wil_en and a["taal"] == "Engels"))
+    and a["titel"] not in st.session_state.beluisterde_titels
+]
+
+# Shuffle de lijst volledig willekeurig voor maximale variatie
+random.shuffle(mogelijke_mix)
+
+# --- PLAYLIST OPBOUWEN OP BASIS VAN TIJD ---
+playlist = []
+totale_tijd = 0
+
+for aflevering in mogelijke_mix:
+    if totale_tijd + aflevering["minuten"] <= minuten_beschikbaar:
+        playlist.append(aflevering)
+        totale_tijd += aflevering["minuten"]
+
+# --- PLAYLIST WEERGEVEN ---
+col1, col2 = st.columns(2)
+with col1: st.metric(label="Aantal fragmenten in mix", value=f"{len(playlist)} stuks")
+with col2: st.metric(label="Gevulde luistertijd", value=f"{totale_tijd} / {minuten_beschikbaar} min")
+
+st.write(" ")
+st.subheader("📋 Jouw Gevarieerde Reismix")
+
+if not playlist:
+    st.info("Geen nieuwe afleveringen gevonden. Vink meer genres aan, wissel van taal of verhoog je reistijd!")
+else:
+    for i, track in enumerate(playlist, 1):
+        icoon = "🔬" if "Wetenschap" in track['genre'] else "🕵️" if "Misdaad" in track['genre'] else "🏰" if "Geschiedenis" in track['genre'] else "📰"
+        
+        st.markdown(f"""
+            <div class="podcast-card">
+                <span style='color: #d1477a; font-weight: bold; text-transform: uppercase; font-size: 0.85em; letter-spacing: 1px;'>🌸 {track['podcast']}</span>
+                <h3 style='margin: 8px 0 12px 0; font-size: 1.25em;'>{i}. {track['titel']}</h3>
+                <span class="badge badge-genre">{icoon} {track['genre']}</span>
+                <span class="badge badge-lang">🌍 {track['taal']}</span>
+                <span class="badge badge-time">⏱️ {track['minuten']} min</span>
+            </div>
+        """, unsafe_allow_html=True)
+        st.audio(track['url'])
+        st.write(" ")
+    
+    st.write("---")
+    if st.button("✔️ Markeer deze hele mix als volledig beluisterd"):
+        for track in playlist:
+            st.session_state.beluisterde_titels.add(track["titel"])
+        st.success("🎉 Gemarkeerd! Deze afleveringen zijn uit je bibliotheek verwijderd. Klik hierboven op 'Schud de kaarten' voor een gloednieuwe mix!")
+        st.balloons()
+
+if st.session_state.beluisterde_titels:
+    st.sidebar.write("---")
+    if st.sidebar.button("🔄 Luistergeschiedenis wissen"):
+        st.session_state.beluisterde_titels.clear()
+        st.sidebar.success("Geschiedenis gereset!")
+        st.rerun()
